@@ -1,0 +1,10 @@
+/target/
+/ferrifirm.bin
+/ferrifirm.rom
+/ferrifirm.elf
+/ferrifirm.map
+/qemu.log
+/qemu_diag.log
+/serial.log
+/nvme.img
+/sata.img
