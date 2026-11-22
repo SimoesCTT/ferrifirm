@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+ferrifirm-allocator = { path = "allocator" }
 
 [profile.dev]
 panic = "abort"
@@ -13,3 +14,7 @@ panic = "abort"
 opt-level = "s"
 lto = false
 codegen-units = 1
+
+[workspace]
+members = ["allocator"]
+resolver = "2"

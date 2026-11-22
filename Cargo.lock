@@ -5,3 +5,10 @@ version = 4
 [[package]]
 name = "ferrifirm"
 version = "0.1.0"
+dependencies = [
+ "ferrifirm-allocator",
+]
+
+[[package]]
+name = "ferrifirm-allocator"
+version = "0.1.0"
