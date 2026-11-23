@@ -54,10 +54,7 @@ pub struct DxeAllocator {
 
 impl DxeAllocator {
     pub fn new(start: u64, end: u64) -> Option<Self> {
-        if start >= end
-            || start % PAGE_SIZE != 0
-            || end % PAGE_SIZE != 0
-        {
+        if start >= end || start % PAGE_SIZE != 0 || end % PAGE_SIZE != 0 {
             return None;
         }
 
@@ -72,10 +69,7 @@ impl DxeAllocator {
         })
     }
 
-    pub fn allocate_pages(
-        &mut self,
-        pages: u64,
-    ) -> Result<u64, AllocateError> {
+    pub fn allocate_pages(&mut self, pages: u64) -> Result<u64, AllocateError> {
         if pages == 0 {
             return Err(AllocateError::InvalidPageCount);
         }
@@ -84,7 +78,8 @@ impl DxeAllocator {
             .checked_mul(PAGE_SIZE)
             .ok_or(AllocateError::SizeOverflow)?;
 
-        let allocation_slot = self.allocations
+        let allocation_slot = self
+            .allocations
             .iter()
             .position(|entry| !entry.active)
             .ok_or(AllocateError::AllocationTableFull)?;
@@ -96,9 +91,7 @@ impl DxeAllocator {
 
         let base = self.free_ranges[range_index].start;
 
-        let end = base
-            .checked_add(bytes)
-            .ok_or(AllocateError::SizeOverflow)?;
+        let end = base.checked_add(bytes).ok_or(AllocateError::SizeOverflow)?;
 
         if end == self.free_ranges[range_index].end {
             self.remove_free_range(range_index);
@@ -115,11 +108,7 @@ impl DxeAllocator {
         Ok(base)
     }
 
-    pub fn free_pages(
-        &mut self,
-        base: u64,
-        pages: u64,
-    ) -> Result<(), FreeError> {
+    pub fn free_pages(&mut self, base: u64, pages: u64) -> Result<(), FreeError> {
         if pages == 0 || base % PAGE_SIZE != 0 {
             return Err(FreeError::InvalidPageCount);
         }
@@ -128,17 +117,12 @@ impl DxeAllocator {
             .checked_mul(PAGE_SIZE)
             .ok_or(FreeError::SizeOverflow)?;
 
-        let end = base
-            .checked_add(bytes)
-            .ok_or(FreeError::SizeOverflow)?;
+        let end = base.checked_add(bytes).ok_or(FreeError::SizeOverflow)?;
 
-        let allocation_slot = self.allocations
+        let allocation_slot = self
+            .allocations
             .iter()
-            .position(|entry| {
-                entry.active
-                    && entry.base == base
-                    && entry.pages == pages
-            })
+            .position(|entry| entry.active && entry.base == base && entry.pages == pages)
             .ok_or(FreeError::InvalidAllocation)?;
 
         self.insert_free_range(base, end)?;
@@ -148,16 +132,10 @@ impl DxeAllocator {
         Ok(())
     }
 
-    fn insert_free_range(
-        &mut self,
-        start: u64,
-        end: u64,
-    ) -> Result<(), FreeError> {
+    fn insert_free_range(&mut self, start: u64, end: u64) -> Result<(), FreeError> {
         let mut index = 0;
 
-        while index < self.free_count
-            && self.free_ranges[index].start < start
-        {
+        while index < self.free_count && self.free_ranges[index].start < start {
             index += 1;
         }
 
@@ -165,30 +143,22 @@ impl DxeAllocator {
             return Err(FreeError::InvalidAllocation);
         }
 
-        if index < self.free_count
-            && end > self.free_ranges[index].start
-        {
+        if index < self.free_count && end > self.free_ranges[index].start {
             return Err(FreeError::InvalidAllocation);
         }
 
-        let joins_previous = index > 0
-            && self.free_ranges[index - 1].end == start;
+        let joins_previous = index > 0 && self.free_ranges[index - 1].end == start;
 
-        let joins_next = index < self.free_count
-            && end == self.free_ranges[index].start;
+        let joins_next = index < self.free_count && end == self.free_ranges[index].start;
 
         if joins_previous && joins_next {
-            self.free_ranges[index - 1].end =
-                self.free_ranges[index].end;
+            self.free_ranges[index - 1].end = self.free_ranges[index].end;
 
             self.remove_free_range(index);
-
         } else if joins_previous {
             self.free_ranges[index - 1].end = end;
-
         } else if joins_next {
             self.free_ranges[index].start = start;
-
         } else {
             if self.free_count >= MAX_FREE_RANGES {
                 return Err(FreeError::FreeRangeTableFull);
@@ -228,10 +198,7 @@ impl DxeAllocator {
     }
 
     pub fn active_allocations(&self) -> usize {
-        self.allocations
-            .iter()
-            .filter(|entry| entry.active)
-            .count()
+        self.allocations.iter().filter(|entry| entry.active).count()
     }
 }
 
@@ -250,8 +217,7 @@ mod tests {
 
     #[test]
     fn rejects_zero_page_allocation() {
-        let mut allocator =
-            DxeAllocator::new(BASE, BASE + PAGE_SIZE).unwrap();
+        let mut allocator = DxeAllocator::new(BASE, BASE + PAGE_SIZE).unwrap();
 
         assert!(matches!(
             allocator.allocate_pages(0),
@@ -261,8 +227,7 @@ mod tests {
 
     #[test]
     fn detects_allocation_size_overflow() {
-        let mut allocator =
-            DxeAllocator::new(BASE, BASE + PAGE_SIZE).unwrap();
+        let mut allocator = DxeAllocator::new(BASE, BASE + PAGE_SIZE).unwrap();
 
         assert!(matches!(
             allocator.allocate_pages(u64::MAX),
@@ -272,8 +237,7 @@ mod tests {
 
     #[test]
     fn detects_out_of_memory() {
-        let mut allocator =
-            DxeAllocator::new(BASE, BASE + PAGE_SIZE).unwrap();
+        let mut allocator = DxeAllocator::new(BASE, BASE + PAGE_SIZE).unwrap();
 
         allocator.allocate_pages(1).unwrap();
 
@@ -285,8 +249,7 @@ mod tests {
 
     #[test]
     fn rejects_invalid_and_double_frees() {
-        let mut allocator =
-            DxeAllocator::new(BASE, BASE + 4 * PAGE_SIZE).unwrap();
+        let mut allocator = DxeAllocator::new(BASE, BASE + 4 * PAGE_SIZE).unwrap();
 
         let page = allocator.allocate_pages(1).unwrap();
 
@@ -305,8 +268,7 @@ mod tests {
 
     #[test]
     fn reuses_freed_memory() {
-        let mut allocator =
-            DxeAllocator::new(BASE, BASE + 4 * PAGE_SIZE).unwrap();
+        let mut allocator = DxeAllocator::new(BASE, BASE + 4 * PAGE_SIZE).unwrap();
 
         let first = allocator.allocate_pages(2).unwrap();
         allocator.free_pages(first, 2).unwrap();
@@ -318,8 +280,7 @@ mod tests {
 
     #[test]
     fn coalesces_adjacent_ranges_on_both_sides() {
-        let mut allocator =
-            DxeAllocator::new(BASE, BASE + 4 * PAGE_SIZE).unwrap();
+        let mut allocator = DxeAllocator::new(BASE, BASE + 4 * PAGE_SIZE).unwrap();
 
         let a = allocator.allocate_pages(1).unwrap();
         let b = allocator.allocate_pages(1).unwrap();
@@ -338,8 +299,7 @@ mod tests {
 
     #[test]
     fn allocation_table_capacity_is_enforced() {
-        let mut allocator =
-            DxeAllocator::new(BASE, BASE + 257 * PAGE_SIZE).unwrap();
+        let mut allocator = DxeAllocator::new(BASE, BASE + 257 * PAGE_SIZE).unwrap();
 
         for _ in 0..256 {
             allocator.allocate_pages(1).unwrap();
@@ -353,8 +313,7 @@ mod tests {
 
     #[test]
     fn fragmented_ranges_remain_allocatable() {
-        let mut allocator =
-            DxeAllocator::new(BASE, BASE + 8 * PAGE_SIZE).unwrap();
+        let mut allocator = DxeAllocator::new(BASE, BASE + 8 * PAGE_SIZE).unwrap();
 
         let mut pages = [0u64; 8];
 
@@ -367,5 +326,215 @@ mod tests {
         }
 
         assert_eq!(allocator.allocate_pages(1).unwrap(), pages[1]);
+    }
+}
+
+#[cfg(test)]
+mod edge_case_tests {
+    use super::*;
+
+    const BASE: u64 = 0x200000;
+
+    #[test]
+    fn allocation_slot_is_reused_after_free() {
+        let mut allocator = DxeAllocator::new(BASE, BASE + 257 * PAGE_SIZE).unwrap();
+
+        let mut pages = [0u64; 256];
+
+        for page in &mut pages {
+            *page = allocator.allocate_pages(1).unwrap();
+        }
+
+        assert_eq!(allocator.active_allocations(), 256);
+
+        allocator.free_pages(pages[17], 1).unwrap();
+
+        let replacement = allocator.allocate_pages(1).unwrap();
+
+        assert_eq!(replacement, pages[17]);
+        assert_eq!(allocator.active_allocations(), 256);
+    }
+
+    #[test]
+    fn free_range_table_exhaustion_preserves_state() {
+        let mut allocator = DxeAllocator::new(BASE, BASE + 257 * PAGE_SIZE).unwrap();
+
+        let mut pages = [0u64; 256];
+
+        for page in &mut pages {
+            *page = allocator.allocate_pages(1).unwrap();
+        }
+
+        // Create 127 isolated free ranges plus the final free page.
+        for index in (0..254).step_by(2) {
+            allocator.free_pages(pages[index], 1).unwrap();
+        }
+
+        let before_failed_free = allocator.remaining_bytes();
+
+        assert!(matches!(
+            allocator.free_pages(pages[254], 1),
+            Err(FreeError::FreeRangeTableFull)
+        ));
+
+        assert_eq!(allocator.remaining_bytes(), before_failed_free);
+
+        // Freeing the adjacent page merges with the trailing range.
+        allocator.free_pages(pages[255], 1).unwrap();
+
+        // The previously rejected free can now coalesce successfully.
+        allocator.free_pages(pages[254], 1).unwrap();
+
+        assert_eq!(
+            allocator.remaining_bytes(),
+            before_failed_free + 2 * PAGE_SIZE
+        );
+    }
+
+    #[test]
+    fn free_rejects_invalid_alignment_and_size_overflow() {
+        let mut allocator = DxeAllocator::new(BASE, BASE + 4 * PAGE_SIZE).unwrap();
+
+        let page = allocator.allocate_pages(1).unwrap();
+
+        assert!(matches!(
+            allocator.free_pages(page + 1, 1),
+            Err(FreeError::InvalidPageCount)
+        ));
+
+        assert!(matches!(
+            allocator.free_pages(page, u64::MAX),
+            Err(FreeError::SizeOverflow)
+        ));
+
+        // Failed frees must leave the original allocation active.
+        assert_eq!(allocator.active_allocations(), 1);
+
+        allocator.free_pages(page, 1).unwrap();
+
+        assert_eq!(allocator.active_allocations(), 0);
+    }
+}
+
+#[cfg(test)]
+mod stress_tests {
+    use super::*;
+
+    const BASE: u64 = 0x400000;
+    const PAGES: u64 = 64;
+
+    fn check_invariants(allocator: &DxeAllocator) {
+        let mut free_bytes = 0u64;
+
+        for i in 0..allocator.free_count {
+            let range = allocator.free_ranges[i];
+
+            assert!(range.start < range.end);
+            assert_eq!(range.start % PAGE_SIZE, 0);
+            assert_eq!(range.end % PAGE_SIZE, 0);
+
+            if i > 0 {
+                assert!(
+                    allocator.free_ranges[i - 1].end < range.start,
+                    "Free ranges overlap or were not coalesced"
+                );
+            }
+
+            free_bytes += range.end - range.start;
+        }
+
+        let mut allocated_bytes = 0u64;
+
+        for i in 0..MAX_ALLOCATIONS {
+            let a = allocator.allocations[i];
+
+            if !a.active {
+                continue;
+            }
+
+            assert!(a.pages > 0);
+            assert_eq!(a.base % PAGE_SIZE, 0);
+
+            let a_end = a.base + a.pages * PAGE_SIZE;
+            allocated_bytes += a.pages * PAGE_SIZE;
+
+            for j in 0..allocator.free_count {
+                let free = allocator.free_ranges[j];
+
+                assert!(
+                    a_end <= free.start || a.base >= free.end,
+                    "Active allocation overlaps free memory"
+                );
+            }
+
+            for j in (i + 1)..MAX_ALLOCATIONS {
+                let b = allocator.allocations[j];
+
+                if !b.active {
+                    continue;
+                }
+
+                let b_end = b.base + b.pages * PAGE_SIZE;
+
+                assert!(
+                    a_end <= b.base || a.base >= b_end,
+                    "Active allocations overlap"
+                );
+            }
+        }
+
+        assert_eq!(
+            free_bytes + allocated_bytes,
+            PAGES * PAGE_SIZE,
+            "Memory accounting invariant failed"
+        );
+
+        assert_eq!(allocator.remaining_bytes(), free_bytes);
+    }
+
+    #[test]
+    fn deterministic_randomized_allocation_stress() {
+        let mut allocator = DxeAllocator::new(BASE, BASE + PAGES * PAGE_SIZE).unwrap();
+
+        let mut seed = 0xC0FFEE_u64;
+
+        for _ in 0..5000 {
+            seed ^= seed << 13;
+            seed ^= seed >> 7;
+            seed ^= seed << 17;
+
+            if seed & 1 == 0 {
+                let pages = 1 + ((seed >> 8) % 4);
+
+                match allocator.allocate_pages(pages) {
+                    Ok(_) => {}
+                    Err(AllocateError::OutOfMemory) | Err(AllocateError::AllocationTableFull) => {}
+                    Err(error) => panic!("Unexpected allocation error: {:?}", error),
+                }
+            } else {
+                let slot = ((seed >> 16) as usize) % MAX_ALLOCATIONS;
+                let allocation = allocator.allocations[slot];
+
+                if allocation.active {
+                    allocator
+                        .free_pages(allocation.base, allocation.pages)
+                        .unwrap();
+                }
+            }
+
+            check_invariants(&allocator);
+        }
+
+        for allocation in allocator.allocations {
+            if allocation.active {
+                allocator
+                    .free_pages(allocation.base, allocation.pages)
+                    .unwrap();
+            }
+        }
+
+        check_invariants(&allocator);
+        assert_eq!(allocator.remaining_bytes(), PAGES * PAGE_SIZE);
+        assert_eq!(allocator.active_allocations(), 0);
     }
 }
